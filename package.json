@@ -4,12 +4,6 @@
   "description": "Sports betting arbitrage API - Profit regardless of the outcome",
   "main": "backend/server.js",
   "scripts": {
-  "start": "node backend/server.js",
-  "dev": "nodemon backend/server.js",
-  "scraper": "node backend/scrapers/scheduler.js",
-  "setup-db": "node backend/database/setup.js",
-  "railway-build": "npm install && node backend/database/setup.js"
-},
     "start": "node backend/server.js",
     "dev": "nodemon backend/server.js",
     "scraper": "node backend/scrapers/scheduler.js",
