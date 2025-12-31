@@ -15,6 +15,19 @@ Real-time sports betting arbitrage API that finds guaranteed profit opportunitie
 - 🤖 **x402 payment support** - AI agents can pay with USDC
 - 🔑 **Dual auth** - API keys OR crypto payments
 
+# ArbitrageEdge API 🎯
+
+[![x402](https://img.shields.io/badge/x402-enabled-00ff88?style=for-the-badge)](https://x402.coinbase.com)
+[![Live](https://img.shields.io/badge/🌐_Live-API-00d4ff?style=for-the-badge)](https://arbitrageedge-production.up.railway.app)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](LICENSE)
+
+**🌐 Live Site:** https://arbitrageedge-production.up.railway.app
+
+**📡 API Endpoint:** https://arbitrageedge-production.up.railway.app/api
+
+**❤️ Health Check:** https://arbitrageedge-production.up.railway.app/health
+
+
 ## 📁 Project Structure
 
 ```
