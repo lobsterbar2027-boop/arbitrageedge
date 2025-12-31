@@ -33,15 +33,15 @@ const X402_CONFIG = {
   // Default timeout (5 minutes)
   maxTimeoutSeconds: 300,
   
-  // Pricing per endpoint
+  // Pricing per endpoint (in USDC with 6 decimals: 0.03 USDC = 30000)
   pricing: {
     '/api/opportunities': {
-      amount: '0.03',
+      amount: '30000',
       description: 'Get all current arbitrage opportunities across 5 sports',
       mimeType: 'application/json'
     },
     '/api/opportunities/:id': {
-      amount: '0.01',
+      amount: '10000',
       description: 'Get specific arbitrage opportunity by ID',
       mimeType: 'application/json'
     }
@@ -127,8 +127,10 @@ function send402PaymentRequired(req, res) {
       output: getOutputSchema(endpoint)
     },
     
-    // Additional metadata
+    // Additional metadata (match CryptoSentiment format)
     extra: {
+      name: 'USD Coin',
+      version: '2',
       category: 'Finance & Trading',
       tags: ['arbitrage', 'sports-betting', 'guaranteed-profit']
     }
