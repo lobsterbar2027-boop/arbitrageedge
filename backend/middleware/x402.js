@@ -36,12 +36,12 @@ const X402_CONFIG = {
   // Pricing per endpoint
   pricing: {
     '/api/opportunities': {
-      amount: '0.03',
+      amount: '0.01',
       description: 'Get all current arbitrage opportunities across 5 sports',
       mimeType: 'application/json'
     },
     '/api/opportunities/:id': {
-      amount: '0.01',
+      amount: '0.005',
       description: 'Get specific arbitrage opportunity by ID',
       mimeType: 'application/json'
     }
@@ -95,13 +95,13 @@ async function x402Middleware(req, res, next) {
  * Includes x402scan validation schema for discoverability
  */
 function send402PaymentRequired(req, res) {
-  const endpoint = req.path;
+  const endpoint = req.originalUrl.split('?')[0] || req.path;
   const pricing = getEndpointPricing(endpoint);
   
   // Build x402-compliant accepts array (x402scan format)
   const accepts = [{
     scheme: X402_CONFIG.scheme,
-    network: 'base',
+    network: 'base', // Human-readable network name
     maxAmountRequired: pricing.amount,
     resource: endpoint,
     description: pricing.description,
@@ -147,7 +147,7 @@ function send402PaymentRequired(req, res) {
  * Verify payment signature via Coinbase facilitator
  */
 async function verifyPayment(req, paymentSignature) {
-  const endpoint = req.path;
+  const endpoint = req.originalUrl.split('?')[0] || req.path;
   const pricing = getEndpointPricing(endpoint);
   const expectedAmount = pricing.amount;
   
