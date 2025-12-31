@@ -36,12 +36,12 @@ const X402_CONFIG = {
   // Pricing per endpoint
   pricing: {
     '/api/opportunities': {
-      amount: '0.01',
+      amount: '0.03',
       description: 'Get all current arbitrage opportunities across 5 sports',
       mimeType: 'application/json'
     },
     '/api/opportunities/:id': {
-      amount: '0.005',
+      amount: '0.01',
       description: 'Get specific arbitrage opportunity by ID',
       mimeType: 'application/json'
     }
