@@ -27,8 +27,8 @@ const X402_CONFIG = {
   // Payment scheme
   scheme: 'exact',
   
-  // Payment asset (USDC on Base)
-  asset: 'eip155:8453/erc20:0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+  // Payment asset (USDC on Base) - use simple contract address for x402scan compatibility
+  asset: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
   
   // Default timeout (5 minutes)
   maxTimeoutSeconds: 300,
