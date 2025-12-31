@@ -33,7 +33,7 @@ const X402_CONFIG = {
   // Default timeout (5 minutes)
   maxTimeoutSeconds: 300,
   
-  // Pricing per endpoint
+// Pricing per endpoint
   pricing: {
     '/api/opportunities': {
       amount: '0.01',
@@ -46,7 +46,6 @@ const X402_CONFIG = {
       mimeType: 'application/json'
     }
   }
-};
 
 /**
  * x402 middleware - handles crypto payments from AI agents
