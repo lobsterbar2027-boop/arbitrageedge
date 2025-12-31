@@ -33,19 +33,20 @@ const X402_CONFIG = {
   // Default timeout (5 minutes)
   maxTimeoutSeconds: 300,
   
-// Pricing per endpoint
+  // Pricing per endpoint
   pricing: {
     '/api/opportunities': {
-      amount: '0.01',
+      amount: '0.03',
       description: 'Get all current arbitrage opportunities across 5 sports',
       mimeType: 'application/json'
     },
     '/api/opportunities/:id': {
-      amount: '0.005',
+      amount: '0.01',
       description: 'Get specific arbitrage opportunity by ID',
       mimeType: 'application/json'
     }
   }
+};
 
 /**
  * x402 middleware - handles crypto payments from AI agents
@@ -100,7 +101,7 @@ function send402PaymentRequired(req, res) {
   // Build x402-compliant accepts array (x402scan format)
   const accepts = [{
     scheme: X402_CONFIG.scheme,
-    network: 'base', // Human-readable network name
+    network: 'base',
     maxAmountRequired: pricing.amount,
     resource: endpoint,
     description: pricing.description,
@@ -123,197 +124,4 @@ function send402PaymentRequired(req, res) {
           }
         }
       },
-      output: getOutputSchema(endpoint)
-    }
-  }];
-  
-  // x402-compliant response body
-  const responseBody = {
-    x402Version: X402_CONFIG.version,
-    accepts: accepts,
-    error: `Payment required: ${pricing.amount} USDC on Base network`
-  };
-  
-  // Set x402 headers (both formats for compatibility)
-  res.status(402)
-    .set('WWW-Authenticate', `x402 version=${X402_CONFIG.version}`)
-    .set('Payment-Required', JSON.stringify(accepts[0]))
-    .set('Access-Control-Expose-Headers', 'Payment-Required, WWW-Authenticate')
-    .json(responseBody);
-}
-
-/**
- * Verify payment signature via Coinbase facilitator
- */
-async function verifyPayment(req, paymentSignature) {
-  const endpoint = req.path;
-  const pricing = getEndpointPricing(endpoint);
-  const expectedAmount = pricing.amount;
-  
-  try {
-    // Parse payment signature (base64-encoded JSON)
-    const payment = JSON.parse(Buffer.from(paymentSignature, 'base64').toString());
-    
-    // Verify payment amount
-    if (parseFloat(payment.amount) < parseFloat(expectedAmount)) {
-      console.log('Insufficient payment amount');
-      return false;
-    }
-    
-    // Verify recipient address
-    if (payment.recipient.toLowerCase() !== X402_CONFIG.walletAddress.toLowerCase()) {
-      console.log('Invalid recipient address');
-      return false;
-    }
-    
-    // Verify network
-    if (!X402_CONFIG.networks.includes(payment.network)) {
-      console.log('Unsupported network');
-      return false;
-    }
-    
-    // Verify signature via Coinbase facilitator
-    const facilitatorResponse = await fetch(`${X402_CONFIG.facilitator}/verify`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        signature: paymentSignature,
-        amount: expectedAmount,
-        asset: X402_CONFIG.asset,
-        recipient: X402_CONFIG.walletAddress,
-        network: payment.network
-      })
-    });
-    
-    if (!facilitatorResponse.ok) {
-      console.log('Facilitator verification failed');
-      return false;
-    }
-    
-    const verification = await facilitatorResponse.json();
-    
-    // Log successful payment
-    console.log(`✅ x402 payment verified: ${expectedAmount} USDC from agent`);
-    
-    return verification.valid === true;
-    
-  } catch (error) {
-    console.error('Payment verification error:', error);
-    return false;
-  }
-}
-
-/**
- * Get pricing configuration for endpoint
- */
-function getEndpointPricing(endpoint) {
-  // Normalize endpoint (remove IDs)
-  const normalizedEndpoint = endpoint.replace(/\/\d+$/, '/:id');
-  
-  return X402_CONFIG.pricing[normalizedEndpoint] || X402_CONFIG.pricing['/api/opportunities'];
-}
-
-/**
- * Get query params schema for x402scan
- */
-function getQueryParamsSchema(endpoint) {
-  if (endpoint === '/api/opportunities') {
-    return {
-      sport: {
-        type: 'string',
-        required: false,
-        description: 'Filter by sport',
-        enum: ['soccer', 'basketball', 'tennis', 'nfl', 'mlb']
-      },
-      min_profit: {
-        type: 'number',
-        required: false,
-        description: 'Minimum profit percentage (e.g., 2.0 for 2%)'
-      },
-      stake: {
-        type: 'number',
-        required: false,
-        description: 'Calculate exact stake amounts for this total stake (e.g., 100 for $100)'
-      }
-    };
-  }
-  
-  if (endpoint.includes('/:id')) {
-    return {
-      stake: {
-        type: 'number',
-        required: false,
-        description: 'Calculate exact stake amounts for this total stake'
-      }
-    };
-  }
-  
-  return {};
-}
-
-/**
- * Get output schema for x402scan
- */
-function getOutputSchema(endpoint) {
-  return {
-    type: 'object',
-    properties: {
-      success: { type: 'boolean' },
-      count: { type: 'number' },
-      opportunities: {
-        type: 'array',
-        items: {
-          type: 'object',
-          properties: {
-            id: { type: 'number' },
-            match: {
-              type: 'object',
-              properties: {
-                name: { type: 'string' },
-                sport: { type: 'string' },
-                team1: { type: 'string' },
-                team2: { type: 'string' }
-              }
-            },
-            profit_percentage: { type: 'number' },
-            bets: {
-              type: 'array',
-              items: {
-                type: 'object',
-                properties: {
-                  outcome: { type: 'string' },
-                  bookmaker: { type: 'string' },
-                  odds: { type: 'number' },
-                  stake_percentage: { type: 'number' },
-                  stake_amount: { type: 'number' },
-                  potential_return: { type: 'number' }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  };
-}
-
-/**
- * Optional: x402 middleware - allows both API keys AND crypto payments
- */
-async function x402OrApiKey(req, res, next) {
-  // Try API key first
-  if (req.headers['x-api-key']) {
-    return next();
-  }
-  
-  // Try x402 payment
-  return x402Middleware(req, res, next);
-}
-
-module.exports = {
-  x402Middleware,
-  x402OrApiKey,
-  X402_CONFIG
-};
+      output: getOutp
