@@ -99,48 +99,73 @@ function send402PaymentRequired(req, res) {
   const pricing = getEndpointPricing(endpoint);
   
   // Build x402-compliant accepts array (x402scan format)
-  const accepts = [{
-    scheme: X402_CONFIG.scheme,
-    network: 'base', // Human-readable network name
-    maxAmountRequired: pricing.amount,
-    resource: endpoint,
-    description: pricing.description,
-    mimeType: pricing.mimeType,
-    payTo: X402_CONFIG.walletAddress,
-    maxTimeoutSeconds: X402_CONFIG.maxTimeoutSeconds,
-    asset: X402_CONFIG.asset,
-    
-    // Output schema for x402scan UI generation
-    outputSchema: {
-      input: {
-        type: 'http',
-        method: req.method,
-        queryParams: getQueryParamsSchema(endpoint),
-        headerFields: {
-          'Payment-Signature': {
-            type: 'string',
-            required: true,
-            description: 'x402 payment signature (base64-encoded)'
+  // x402scan requires at least one EnhancedPaymentRequirements object
+  const accepts = [
+    // Standard x402 accept object
+    {
+      scheme: X402_CONFIG.scheme,
+      network: 'base',
+      maxAmountRequired: pricing.amount,
+      resource: endpoint,
+      description: pricing.description,
+      mimeType: pricing.mimeType,
+      payTo: X402_CONFIG.walletAddress,
+      maxTimeoutSeconds: X402_CONFIG.maxTimeoutSeconds,
+      asset: X402_CONFIG.asset,
+      
+      // Output schema for x402scan UI generation
+      outputSchema: {
+        input: {
+          type: 'http',
+          method: req.method,
+          queryParams: getQueryParamsSchema(endpoint),
+          headerFields: {
+            'Payment-Signature': {
+              type: 'string',
+              required: true,
+              description: 'x402 payment signature (base64-encoded)'
+            }
           }
-        }
+        },
+        output: getOutputSchema(endpoint)
       },
-      output: getOutputSchema(endpoint)
+      
+      // Additional metadata
+      extra: {
+        category: 'Finance & Trading',
+        tags: ['arbitrage', 'sports-betting', 'guaranteed-profit']
+      }
     },
-    
-    // Additional metadata in extra field (as per x402scan schema)
-    extra: {
+    // EnhancedPaymentRequirements object for x402scan
+    {
+      type: 'EnhancedPaymentRequirements',
+      scheme: X402_CONFIG.scheme,
+      network: 'base',
+      payTo: X402_CONFIG.walletAddress,
+      asset: X402_CONFIG.asset,
+      amount: pricing.amount,
       facilitator: {
         name: 'Coinbase CDP',
-        url: X402_CONFIG.facilitator,
+        baseUrl: X402_CONFIG.facilitator,
+        verifyUrl: X402_CONFIG.facilitator + '/verify',
+        settleUrl: X402_CONFIG.facilitator + '/settle',
+        networks: ['eip155:8453'],
+        schemes: ['exact'],
+        assets: [X402_CONFIG.asset],
         supports: {
           verify: true,
-          settle: true
+          settle: true,
+          supported: true,
+          list: false
         }
       },
-      category: 'Finance & Trading',
-      tags: ['arbitrage', 'sports-betting', 'guaranteed-profit']
+      metadata: {
+        service: 'ArbitrageEdge',
+        category: 'Finance & Trading',
+        description: pricing.description
+      }
     }
-  }];
+  ];
   
   // x402-compliant response body
   const responseBody = {
