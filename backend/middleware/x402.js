@@ -110,16 +110,6 @@ function send402PaymentRequired(req, res) {
     maxTimeoutSeconds: X402_CONFIG.maxTimeoutSeconds,
     asset: X402_CONFIG.asset,
     
-    // Facilitator information for x402scan EnhancedPaymentRequirements
-    facilitator: {
-      name: 'Coinbase CDP',
-      url: X402_CONFIG.facilitator,
-      supports: {
-        verify: true,
-        settle: true
-      }
-    },
-    
     // Output schema for x402scan UI generation
     outputSchema: {
       input: {
@@ -135,6 +125,20 @@ function send402PaymentRequired(req, res) {
         }
       },
       output: getOutputSchema(endpoint)
+    },
+    
+    // Additional metadata in extra field (as per x402scan schema)
+    extra: {
+      facilitator: {
+        name: 'Coinbase CDP',
+        url: X402_CONFIG.facilitator,
+        supports: {
+          verify: true,
+          settle: true
+        }
+      },
+      category: 'Finance & Trading',
+      tags: ['arbitrage', 'sports-betting', 'guaranteed-profit']
     }
   }];
   
