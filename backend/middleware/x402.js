@@ -103,44 +103,34 @@ function send402PaymentRequired(req, res) {
     scheme: X402_CONFIG.scheme,
     network: 'base',
     maxAmountRequired: pricing.amount,
-    resource: endpoint,
+    asset: X402_CONFIG.asset,
+    payTo: X402_CONFIG.walletAddress,
+    resource: `https://arbitrageedge-production.up.railway.app${endpoint}`,
     description: pricing.description,
     mimeType: pricing.mimeType,
-    payTo: X402_CONFIG.walletAddress,
     maxTimeoutSeconds: X402_CONFIG.maxTimeoutSeconds,
-    asset: X402_CONFIG.asset,
     
     // Output schema for x402scan UI generation
     outputSchema: {
       input: {
         type: 'http',
-        method: req.method,
-        queryParams: getQueryParamsSchema(endpoint),
-        headerFields: {
-          'Payment-Signature': {
-            type: 'string',
-            required: true,
-            description: 'x402 payment signature (base64-encoded)'
-          }
-        }
+        method: req.method
       },
       output: getOutputSchema(endpoint)
     },
     
-    // Additional metadata (match CryptoSentiment format)
+    // Minimal extra (match CryptoSentiment exactly)
     extra: {
       name: 'USD Coin',
-      version: '2',
-      category: 'Finance & Trading',
-      tags: ['arbitrage', 'sports-betting', 'guaranteed-profit']
+      version: '2'
     }
   }];
   
   // x402-compliant response body
   const responseBody = {
     x402Version: X402_CONFIG.version,
-    accepts: accepts,
-    error: `Payment required: ${pricing.amount} USDC on Base network`
+    error: 'X-PAYMENT header is required',
+    accepts: accepts
   };
   
   // Set x402 headers (both formats for compatibility)
@@ -263,13 +253,16 @@ function getQueryParamsSchema(endpoint) {
 }
 
 /**
- * Get output schema for x402scan
+ * Get output schema for x402scan (simplified like CryptoSentiment)
  */
 function getOutputSchema(endpoint) {
   return {
-    success: { type: 'boolean' },
-    count: { type: 'number' },
-    opportunities: { type: 'array' }
+    match: { type: 'string' },
+    sport: { type: 'string' },
+    profit_percentage: { type: 'number' },
+    stake_total: { type: 'number' },
+    bets: { type: 'array' },
+    timestamp: { type: 'string' }
   };
 }
 
