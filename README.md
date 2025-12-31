@@ -209,8 +209,8 @@ Best for AI agents that want instant access without signup.
 - Solana (solana:mainnet)
 
 **Pricing:**
-- `/api/opportunities` → $0.01 per request
-- `/api/opportunities/:id` → $0.005 per request
+- `/api/opportunities` → $0.03 per request
+- `/api/opportunities/:id` → $0.01 per request
 
 **See [X402_SETUP.md](X402_SETUP.md) for complete x402 configuration guide.**
 
