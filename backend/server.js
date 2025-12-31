@@ -96,8 +96,8 @@ app.get('/api', (req, res) => {
           token: 'USDC',
           facilitator: 'Coinbase CDP (fee-free)',
           pricing: {
-            '/api/opportunities': '$0.01 per request',
-            '/api/opportunities/:id': '$0.005 per request'
+            '/api/opportunities': '$0.03 per request',
+            '/api/opportunities/:id': '$0.01 per request'
           }
         }
       ]
