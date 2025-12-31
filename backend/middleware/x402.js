@@ -36,12 +36,12 @@ const X402_CONFIG = {
   // Pricing per endpoint
   pricing: {
     '/api/opportunities': {
-      amount: '0.03',
+      amount: '0.01',
       description: 'Get all current arbitrage opportunities across 5 sports',
       mimeType: 'application/json'
     },
     '/api/opportunities/:id': {
-      amount: '0.01',
+      amount: '0.005',
       description: 'Get specific arbitrage opportunity by ID',
       mimeType: 'application/json'
     }
@@ -109,6 +109,16 @@ function send402PaymentRequired(req, res) {
     payTo: X402_CONFIG.walletAddress,
     maxTimeoutSeconds: X402_CONFIG.maxTimeoutSeconds,
     asset: X402_CONFIG.asset,
+    
+    // Facilitator information for x402scan EnhancedPaymentRequirements
+    facilitator: {
+      name: 'Coinbase CDP',
+      url: X402_CONFIG.facilitator,
+      supports: {
+        verify: true,
+        settle: true
+      }
+    },
     
     // Output schema for x402scan UI generation
     outputSchema: {
@@ -259,44 +269,9 @@ function getQueryParamsSchema(endpoint) {
  */
 function getOutputSchema(endpoint) {
   return {
-    type: 'object',
-    properties: {
-      success: { type: 'boolean' },
-      count: { type: 'number' },
-      opportunities: {
-        type: 'array',
-        items: {
-          type: 'object',
-          properties: {
-            id: { type: 'number' },
-            match: {
-              type: 'object',
-              properties: {
-                name: { type: 'string' },
-                sport: { type: 'string' },
-                team1: { type: 'string' },
-                team2: { type: 'string' }
-              }
-            },
-            profit_percentage: { type: 'number' },
-            bets: {
-              type: 'array',
-              items: {
-                type: 'object',
-                properties: {
-                  outcome: { type: 'string' },
-                  bookmaker: { type: 'string' },
-                  odds: { type: 'number' },
-                  stake_percentage: { type: 'number' },
-                  stake_amount: { type: 'number' },
-                  potential_return: { type: 'number' }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
+    success: { type: 'boolean' },
+    count: { type: 'number' },
+    opportunities: { type: 'array' }
   };
 }
 
