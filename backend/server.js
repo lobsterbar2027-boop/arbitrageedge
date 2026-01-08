@@ -6,12 +6,12 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const cron = require('node-cron');
 require('dotenv').config();
 
 const { authenticateApiKey } = require('./middleware/auth');
 const { x402OrApiKey } = require('./middleware/x402');
 const opportunitiesRouter = require('./routes/opportunities');
-const { startScheduler } = require('./scrapers/scheduler');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -35,7 +35,8 @@ app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    uptime: process.uptime()
+    uptime: process.uptime(),
+    mode: 'on-demand scraping'
   });
 });
 
@@ -45,6 +46,8 @@ app.get('/api', (req, res) => {
     name: 'ArbitrageEdge API',
     version: '1.0.0',
     description: 'Real-time sports betting arbitrage opportunities',
+    scraping_mode: 'on-demand (data refreshed when API is called)',
+    cache_duration: '30 minutes',
     endpoints: {
       opportunities: {
         'GET /api/opportunities': {
@@ -136,32 +139,12 @@ app.use((err, req, res, next) => {
 app.listen(PORT, () => {
   console.log('');
   console.log('🚀 ArbitrageEdge API Server');
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   console.log(`✅ Server running on port ${PORT}`);
-  console.log(`📍 API: http://localhost:${PORT}/api`);
+  console.log(`🔗 API: http://localhost:${PORT}/api`);
   console.log(`🏠 Frontend: http://localhost:${PORT}`);
   console.log(`💚 Health: http://localhost:${PORT}/health`);
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   console.log('');
-  
-  // Start the scraper scheduler
-  if (process.env.ENABLE_SCHEDULER !== 'false') {
-    console.log('🔄 Starting background scheduler...');
-    startScheduler();
-  } else {
-    console.log('⏸️  Scheduler disabled (set ENABLE_SCHEDULER=true to enable)');
-  }
-});
-
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('👋 SIGTERM received, shutting down gracefully...');
-  process.exit(0);
-});
-
-process.on('SIGINT', () => {
-  console.log('\n👋 SIGINT received, shutting down gracefully...');
-  process.exit(0);
-});
-
-module.exports = app;
+  console.log('💡 Mode: On-Demand Scraping');
+  console.log('📊 Data refr
