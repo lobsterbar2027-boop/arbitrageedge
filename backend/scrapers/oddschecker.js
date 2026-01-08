@@ -1,102 +1,124 @@
 /**
- * Oddschecker Scraper
- * Scrapes odds from Oddschecker.com (aggregator showing 20+ bookmakers)
+ * Odds Scraper - Uses The Odds API for real-time odds
  */
 
 const axios = require('axios');
-const cheerio = require('cheerio');
 const { v4: uuidv4 } = require('uuid');
 
+const ODDS_API_KEY = process.env.ODDS_API_KEY;
+const ODDS_API_BASE = 'https://api.the-odds-api.com/v4';
+
+// Map our sports to The Odds API sport keys
 const SPORTS_CONFIG = [
   { 
     name: 'soccer', 
-    url: 'https://www.oddschecker.com/football',
-    has_draw: true
+    api_key: 'soccer_epl',  // English Premier League
+    has_draw: true,
+    display_name: 'Soccer - Premier League'
   },
   { 
     name: 'basketball', 
-    url: 'https://www.oddschecker.com/basketball/nba',
-    has_draw: false
+    api_key: 'basketball_nba',
+    has_draw: false,
+    display_name: 'NBA Basketball'
   },
   { 
     name: 'tennis', 
-    url: 'https://www.oddschecker.com/tennis',
-    has_draw: false
+    api_key: 'tennis_atp',
+    has_draw: false,
+    display_name: 'Tennis - ATP'
   },
   { 
     name: 'nfl', 
-    url: 'https://www.oddschecker.com/american-football/nfl',
-    has_draw: false
+    api_key: 'americanfootball_nfl',
+    has_draw: false,
+    display_name: 'NFL'
   },
   { 
     name: 'mlb', 
-    url: 'https://www.oddschecker.com/baseball/usa/mlb',
-    has_draw: false
+    api_key: 'baseball_mlb',
+    has_draw: false,
+    display_name: 'MLB Baseball'
   }
 ];
 
 /**
- * Scrape odds for a specific sport
- * Note: This is a simplified scraper. In production, you'd use Apify's
- * web scraper or build a more robust scraper with Puppeteer
+ * Scrape odds for a specific sport using The Odds API
  */
 async function scrapeOddsForSport(sportConfig) {
-  console.log(`🔍 Scraping ${sportConfig.name}...`);
+  console.log(`🔍 Scraping ${sportConfig.display_name}...`);
+  
+  if (!ODDS_API_KEY) {
+    console.error('❌ ODDS_API_KEY not set in environment variables');
+    return [];
+  }
   
   try {
-    // For MVP, we'll generate mock data
-    // In production, replace this with actual Apify scraper or Puppeteer
-    const mockOdds = generateMockOdds(sportConfig);
+    const url = `${ODDS_API_BASE}/sports/${sportConfig.api_key}/odds`;
     
-    console.log(`✅ Scraped ${mockOdds.length} odds for ${sportConfig.name}`);
-    return mockOdds;
-    
-    /* PRODUCTION CODE (uncomment when ready):
-    
-    const response = await axios.get(sportConfig.url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+    const response = await axios.get(url, {
+      params: {
+        apiKey: ODDS_API_KEY,
+        regions: 'us,uk',  // Get US and UK bookmakers
+        markets: 'h2h',    // Head-to-head (match winner)
+        oddsFormat: 'decimal'
       }
     });
     
-    const $ = cheerio.load(response.data);
-    const odds = [];
+    const games = response.data;
     
-    // Parse odds from HTML
-    // This will vary based on Oddschecker's structure
-    $('.match-row').each((i, element) => {
-      const team1 = $(element).find('.team1').text().trim();
-      const team2 = $(element).find('.team2').text().trim();
+    if (!games || games.length === 0) {
+      console.log(`ℹ️ No games found for ${sportConfig.name}`);
+      return [];
+    }
+    
+    // Convert The Odds API format to our format
+    const allOdds = [];
+    
+    for (const game of games) {
+      const matchId = generateMatchId(game.home_team, game.away_team);
+      const matchName = `${game.home_team} vs ${game.away_team}`;
       
-      // Extract odds from each bookmaker
-      $(element).find('.bookmaker-odds').each((j, bookmakerEl) => {
-        const bookmaker = $(bookmakerEl).data('bookmaker');
-        const odds1 = parseFloat($(bookmakerEl).find('.odds1').text());
-        const odds2 = parseFloat($(bookmakerEl).find('.odds2').text());
-        const drawOdds = sportConfig.has_draw 
-          ? parseFloat($(bookmakerEl).find('.draw-odds').text()) 
-          : null;
+      // Process each bookmaker's odds
+      for (const bookmaker of game.bookmakers) {
+        const market = bookmaker.markets.find(m => m.key === 'h2h');
         
-        odds.push({
+        if (!market || !market.outcomes) continue;
+        
+        // Find odds for each outcome
+        const homeOutcome = market.outcomes.find(o => o.name === game.home_team);
+        const awayOutcome = market.outcomes.find(o => o.name === game.away_team);
+        const drawOutcome = market.outcomes.find(o => o.name === 'Draw');
+        
+        if (!homeOutcome || !awayOutcome) continue;
+        
+        allOdds.push({
           sport: sportConfig.name,
-          match_id: generateMatchId(team1, team2),
-          match_name: `${team1} vs ${team2}`,
-          team1,
-          team2,
-          bookmaker,
-          odds1,
-          odds2,
-          draw_odds: drawOdds,
-          match_date: extractMatchDate($, element)
+          match_id: matchId,
+          match_name: matchName,
+          team1: game.home_team,
+          team2: game.away_team,
+          bookmaker: bookmaker.title,
+          odds1: parseFloat(homeOutcome.price),
+          odds2: parseFloat(awayOutcome.price),
+          draw_odds: drawOutcome ? parseFloat(drawOutcome.price) : null,
+          match_date: new Date(game.commence_time)
         });
-      });
-    });
+      }
+    }
     
-    return odds;
-    */
+    console.log(`✅ Scraped ${allOdds.length} odds records for ${sportConfig.name}`);
+    return allOdds;
     
   } catch (error) {
     console.error(`❌ Error scraping ${sportConfig.name}:`, error.message);
+    
+    // Show more details if it's an API error
+    if (error.response) {
+      console.error(`API Error: ${error.response.status} - ${error.response.statusText}`);
+      console.error('Response:', error.response.data);
+    }
+    
     return [];
   }
 }
@@ -114,7 +136,7 @@ async function scrapeAllSports() {
     allOdds.push(...odds);
     
     // Small delay to avoid rate limiting
-    await delay(2000);
+    await delay(1000);
   }
   
   console.log(`✅ Total odds scraped: ${allOdds.length}`);
@@ -122,96 +144,21 @@ async function scrapeAllSports() {
 }
 
 /**
- * Generate mock odds for testing
- * Replace this with real scraper in production
+ * Get list of available sports from The Odds API
  */
-function generateMockOdds(sportConfig) {
-  const matches = generateMockMatches(sportConfig);
-  const bookmakers = [
-    'Bet365', 'DraftKings', 'FanDuel', 'BetMGM', 'Caesars',
-    'PointsBet', 'BetRivers', 'Unibet', 'William Hill', '888sport'
-  ];
-  
-  const odds = [];
-  
-  matches.forEach(match => {
-    bookmakers.forEach(bookmaker => {
-      // Generate odds with slight variations between bookmakers
-      const baseOdds1 = 1.5 + Math.random() * 3;
-      const baseOdds2 = 1.5 + Math.random() * 3;
-      
-      // Add variation (this creates arbitrage opportunities sometimes)
-      const variation = (Math.random() - 0.5) * 0.3;
-      
-      const odds1 = parseFloat((baseOdds1 + variation).toFixed(2));
-      const odds2 = parseFloat((baseOdds2 - variation).toFixed(2));
-      const drawOdds = sportConfig.has_draw 
-        ? parseFloat((3.0 + Math.random() * 2).toFixed(2))
-        : null;
-      
-      odds.push({
-        sport: sportConfig.name,
-        match_id: match.id,
-        match_name: match.name,
-        team1: match.team1,
-        team2: match.team2,
-        bookmaker,
-        odds1,
-        odds2,
-        draw_odds: drawOdds,
-        match_date: match.date
-      });
+async function getAvailableSports() {
+  try {
+    const response = await axios.get(`${ODDS_API_BASE}/sports`, {
+      params: {
+        apiKey: ODDS_API_KEY
+      }
     });
-  });
-  
-  return odds;
-}
-
-/**
- * Generate mock matches for a sport
- */
-function generateMockMatches(sportConfig) {
-  const teamsByPort = {
-    soccer: [
-      ['Manchester United', 'Liverpool'],
-      ['Barcelona', 'Real Madrid'],
-      ['Bayern Munich', 'Dortmund'],
-      ['PSG', 'Marseille'],
-      ['Arsenal', 'Chelsea']
-    ],
-    basketball: [
-      ['Lakers', 'Celtics'],
-      ['Warriors', 'Nets'],
-      ['Heat', 'Bucks'],
-      ['Nuggets', 'Suns']
-    ],
-    tennis: [
-      ['Djokovic', 'Nadal'],
-      ['Alcaraz', 'Medvedev'],
-      ['Swiatek', 'Sabalenka']
-    ],
-    nfl: [
-      ['Chiefs', 'Bills'],
-      ['49ers', 'Eagles'],
-      ['Cowboys', 'Packers']
-    ],
-    mlb: [
-      ['Yankees', 'Red Sox'],
-      ['Dodgers', 'Giants'],
-      ['Astros', 'Rangers']
-    ]
-  };
-  
-  const teams = teamsByPort[sportConfig.name] || [];
-  const now = new Date();
-  
-  return teams.map((matchup, i) => ({
-    id: generateMatchId(matchup[0], matchup[1]),
-    name: `${matchup[0]} vs ${matchup[1]}`,
-    team1: matchup[0],
-    team2: matchup[1],
-    date: new Date(now.getTime() + (i + 1) * 24 * 60 * 60 * 1000) // Spread over next few days
-  }));
+    
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching sports:', error.message);
+    return [];
+  }
 }
 
 /**
@@ -223,7 +170,7 @@ function generateMatchId(team1, team2) {
     .sort()
     .join('_');
   
-  return `match_${normalized}_${Date.now().toString().slice(-6)}`;
+  return `match_${normalized}`;
 }
 
 /**
@@ -236,5 +183,6 @@ function delay(ms) {
 module.exports = {
   scrapeAllSports,
   scrapeOddsForSport,
+  getAvailableSports,
   SPORTS_CONFIG
 };
