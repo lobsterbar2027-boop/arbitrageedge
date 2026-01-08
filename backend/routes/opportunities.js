@@ -223,4 +223,3 @@ router.get('/sports/list', async (req, res) => {
 });
 
 module.exports = router;
-```
