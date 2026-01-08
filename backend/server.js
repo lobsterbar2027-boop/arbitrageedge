@@ -115,9 +115,6 @@ app.get('/api', (req, res) => {
 });
 
 // Protected API routes (require authentication OR payment)
-// Supports BOTH:
-// 1. Traditional API keys (X-API-Key header)
-// 2. x402 crypto payments (Payment-Signature header) for AI agents
 app.use('/api/opportunities', x402OrApiKey, opportunitiesRouter);
 
 // Catch-all route - serve frontend
@@ -147,4 +144,37 @@ app.listen(PORT, () => {
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   console.log('');
   console.log('💡 Mode: On-Demand Scraping');
-  console.log('📊 Data refr
+  console.log('📊 Data refreshed when API is called');
+  console.log('⏱️  Cache duration: 30 minutes');
+  console.log('🎯 This maximizes free tier usage!');
+  console.log('');
+  
+  // Cleanup old data every 6 hours
+  console.log('🧹 Scheduling cleanup job (every 6 hours)...');
+  cron.schedule('0 */6 * * *', async () => {
+    console.log('🧹 Running scheduled cleanup...');
+    try {
+      const { cleanupOldData } = require('./database/queries');
+      await cleanupOldData();
+      console.log('✅ Cleanup completed');
+    } catch (error) {
+      console.error('❌ Cleanup failed:', error.message);
+    }
+  });
+  
+  console.log('✅ Cleanup job scheduled');
+  console.log('');
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('👋 SIGTERM received, shutting down gracefully...');
+  process.exit(0);
+});
+
+process.on('SIGINT', () => {
+  console.log('\n👋 SIGINT received, shutting down gracefully...');
+  process.exit(0);
+});
+
+module.exports = app;
