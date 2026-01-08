@@ -6,6 +6,7 @@ const express = require('express');
 const router = express.Router();
 const { getArbitrageOpportunities } = require('../database/queries');
 const { calculateStakeAmounts } = require('../calculator/arbitrage');
+const { getOrScrapeData } = require('../scrapers/on-demand');
 
 /**
  * GET /api/opportunities
@@ -18,6 +19,15 @@ const { calculateStakeAmounts } = require('../calculator/arbitrage');
  */
 router.get('/', async (req, res) => {
   try {
+    // On-demand scraping: Get fresh data if needed
+    const scrapeResult = await getOrScrapeData();
+    
+    if (scrapeResult.scraped) {
+      console.log(`💰 API call triggered fresh scrape (${scrapeResult.oddsCount} odds)`);
+    } else if (scrapeResult.cacheAge !== undefined) {
+      console.log(`📊 Using cached data (${scrapeResult.cacheAge} min old)`);
+    }
+    
     const { sport, min_profit, stake } = req.query;
     
     const filters = {};
@@ -95,7 +105,10 @@ router.get('/', async (req, res) => {
       filters: {
         sport: sport || 'all',
         min_profit: min_profit ? parseFloat(min_profit) : 0
-      }
+      },
+      cache_info: scrapeResult.scraped 
+        ? { fresh_scrape: true, odds_count: scrapeResult.oddsCount }
+        : { cached: true, age_minutes: scrapeResult.cacheAge }
     });
     
   } catch (error) {
@@ -193,7 +206,7 @@ router.get('/:id', async (req, res) => {
 });
 
 /**
- * GET /api/sports
+ * GET /api/opportunities/sports/list
  * Get list of available sports
  */
 router.get('/sports/list', async (req, res) => {
@@ -210,3 +223,4 @@ router.get('/sports/list', async (req, res) => {
 });
 
 module.exports = router;
+```
