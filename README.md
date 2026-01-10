@@ -1,7 +1,7 @@
 # ArbitrageEdge API 🎯
 
 **Profit Regardless of the Outcome**
-
+     
 Real-time sports betting arbitrage API that finds guaranteed profit opportunities across 20+ bookmakers.
 
 ## 🚀 Features
