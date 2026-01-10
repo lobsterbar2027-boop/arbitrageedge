@@ -22,11 +22,20 @@ async function setupDatabase() {
     console.log('✅ Database setup complete!');
     console.log('✅ Demo API key created: demo_key_12345');
     
-    process.exit(0);
+    // Don't exit - let the server start
+    await pool.end();
+    
   } catch (error) {
     console.error('❌ Database setup failed:', error);
-    process.exit(1);
+    // Don't exit on error either - tables might already exist
+    await pool.end();
   }
 }
 
-setupDatabase();
+// Only run if this file is executed directly
+if (require.main === module) {
+  setupDatabase().then(() => process.exit(0));
+} else {
+  // When required by another script, just run and return
+  module.exports = setupDatabase();
+}
