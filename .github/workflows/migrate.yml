@@ -1,0 +1,49 @@
+name: Database Migration
+
+on:
+  workflow_dispatch:
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+      
+      - name: Install dependencies
+        run: npm install pg
+      
+      - name: Run migration
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          cat > migrate.js << 'EOF'
+          const { Client } = require('pg');
+          const fs = require('fs');
+          
+          async function migrate() {
+            const client = new Client({
+              connectionString: process.env.DATABASE_URL,
+              ssl: { rejectUnauthorized: false }
+            });
+            
+            try {
+              await client.connect();
+              const schema = fs.readFileSync('backend/database/schema.sql', 'utf8');
+              await client.query(schema);
+              console.log('✅ Migration complete!');
+            } catch (error) {
+              console.error('❌ Migration failed:', error);
+              process.exit(1);
+            } finally {
+              await client.end();
+            }
+          }
+          
+          migrate();
+          EOF
+          node migrate.js
