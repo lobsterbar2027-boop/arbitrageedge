@@ -3,12 +3,18 @@ const fs = require('fs');
 const path = require('path');
 require('dotenv').config();
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-});
-
 async function setupDatabase() {
+  // Skip setup if DATABASE_URL is not available
+  if (!process.env.DATABASE_URL) {
+    console.log('⏭️  Skipping database setup (DATABASE_URL not set)');
+    return;
+  }
+
+  const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+  });
+
   try {
     console.log('Setting up database...');
     
@@ -22,20 +28,18 @@ async function setupDatabase() {
     console.log('✅ Database setup complete!');
     console.log('✅ Demo API key created: demo_key_12345');
     
-    // Don't exit - let the server start
-    await pool.end();
-    
   } catch (error) {
-    console.error('❌ Database setup failed:', error);
-    // Don't exit on error either - tables might already exist
+    console.error('❌ Database setup failed:', error.message);
+    // Don't throw - let server start anyway
+  } finally {
     await pool.end();
   }
 }
 
-// Only run if this file is executed directly
-if (require.main === module) {
-  setupDatabase().then(() => process.exit(0));
-} else {
-  // When required by another script, just run and return
-  module.exports = setupDatabase();
-}
+// Run setup and continue
+setupDatabase().catch(err => {
+  console.error('Setup error:', err.message);
+});
+
+// Export for use in other scripts
+module.exports = setupDatabase;
