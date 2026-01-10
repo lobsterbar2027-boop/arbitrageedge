@@ -1,5 +1,8 @@
 [build]
 builder = "nixpacks"
 
+[nixpacksPlan]
+build = false
+
 [deploy]
 startCommand = "node backend/server.js"
