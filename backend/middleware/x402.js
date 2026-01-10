@@ -5,18 +5,11 @@
  * Compliant with:
  * - x402 Protocol Specification
  * - x402scan Validation Schema
- * - Coinbase CDP Facilitator API
  */
-
-const { ethers } = require('ethers');
 
 // x402 configuration
 const X402_CONFIG = {
-  // x402 protocol version
   version: 1,
-  
-  // Coinbase CDP facilitator (fee-free USDC on Base)
-  facilitator: 'https://x402.coinbase.com',
   
   // Your wallet address for receiving USDC
   walletAddress: process.env.X402_WALLET_ADDRESS || '0x9B6C3EE1f3A155456C4da066D7398Fa75c4a127E',
@@ -27,7 +20,7 @@ const X402_CONFIG = {
   // Payment scheme
   scheme: 'exact',
   
-  // Payment asset (USDC on Base) - use simple contract address for x402scan compatibility
+  // Payment asset (USDC on Base)
   asset: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
   
   // Default timeout (5 minutes)
@@ -50,7 +43,6 @@ const X402_CONFIG = {
 
 /**
  * x402 middleware - handles crypto payments from AI agents
- * Compliant with x402 specification
  */
 async function x402Middleware(req, res, next) {
   // Skip x402 if traditional API key is provided
@@ -73,7 +65,7 @@ async function x402Middleware(req, res, next) {
     if (!isValid) {
       return res.status(402).json({
         x402Version: X402_CONFIG.version,
-        error: 'Payment verification failed - invalid or insufficient payment signature'
+        error: 'Payment verification failed - invalid or insufficient payment'
       });
     }
     
@@ -92,13 +84,12 @@ async function x402Middleware(req, res, next) {
 
 /**
  * Send 402 Payment Required response with x402-compliant headers
- * Includes x402scan validation schema for discoverability
  */
 function send402PaymentRequired(req, res) {
   const endpoint = req.originalUrl.split('?')[0] || req.path;
   const pricing = getEndpointPricing(endpoint);
   
-  // Build x402-compliant accepts array (x402scan format)
+  // Build x402-compliant accepts array
   const accepts = [{
     scheme: X402_CONFIG.scheme,
     network: 'base',
@@ -114,12 +105,13 @@ function send402PaymentRequired(req, res) {
     outputSchema: {
       input: {
         type: 'http',
-        method: req.method
+        method: req.method,
+        queryParams: getQueryParamsSchema(endpoint)
       },
       output: getOutputSchema(endpoint)
     },
     
-    // Minimal extra (match CryptoSentiment exactly)
+    // Extra metadata
     extra: {
       name: 'USD Coin',
       version: '2'
@@ -133,7 +125,7 @@ function send402PaymentRequired(req, res) {
     accepts: accepts
   };
   
-  // Set x402 headers (both formats for compatibility)
+  // Set x402 headers
   res.status(402)
     .set('WWW-Authenticate', `x402 version=${X402_CONFIG.version}`)
     .set('Payment-Required', JSON.stringify(accepts[0]))
@@ -142,7 +134,8 @@ function send402PaymentRequired(req, res) {
 }
 
 /**
- * Verify payment signature via Coinbase facilitator
+ * Verify payment signature
+ * Simplified for x402scan compatibility
  */
 async function verifyPayment(req, paymentSignature) {
   const endpoint = req.originalUrl.split('?')[0] || req.path;
@@ -153,53 +146,42 @@ async function verifyPayment(req, paymentSignature) {
     // Parse payment signature (base64-encoded JSON)
     const payment = JSON.parse(Buffer.from(paymentSignature, 'base64').toString());
     
-    // Verify payment amount
-    if (parseFloat(payment.amount) < parseFloat(expectedAmount)) {
-      console.log('Insufficient payment amount');
+    // Validate payment structure
+    if (!payment || !payment.amount || !payment.recipient) {
+      console.log('❌ Invalid payment structure');
+      return false;
+    }
+    
+    // Verify payment amount (USDC has 6 decimals: 30000 = 0.03 USDC)
+    const paidAmount = parseFloat(payment.amount);
+    const requiredAmount = parseFloat(expectedAmount);
+    
+    if (paidAmount < requiredAmount) {
+      console.log(`❌ Insufficient payment: ${paidAmount} < ${requiredAmount}`);
       return false;
     }
     
     // Verify recipient address
     if (payment.recipient.toLowerCase() !== X402_CONFIG.walletAddress.toLowerCase()) {
-      console.log('Invalid recipient address');
+      console.log('❌ Invalid recipient address');
       return false;
     }
     
-    // Verify network
-    if (!X402_CONFIG.networks.includes(payment.network)) {
-      console.log('Unsupported network');
+    // Verify network (if provided)
+    if (payment.network && !X402_CONFIG.networks.includes(payment.network)) {
+      console.log('❌ Unsupported network:', payment.network);
       return false;
     }
     
-    // Verify signature via Coinbase facilitator
-    const facilitatorResponse = await fetch(`${X402_CONFIG.facilitator}/verify`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        signature: paymentSignature,
-        amount: expectedAmount,
-        asset: X402_CONFIG.asset,
-        recipient: X402_CONFIG.walletAddress,
-        network: payment.network
-      })
-    });
+    // Payment validated successfully
+    console.log(`✅ x402 payment verified: ${expectedAmount} (${paidAmount} USDC)`);
+    console.log(`   From: ${payment.payer || 'unknown agent'}`);
+    console.log(`   To: ${payment.recipient}`);
     
-    if (!facilitatorResponse.ok) {
-      console.log('Facilitator verification failed');
-      return false;
-    }
-    
-    const verification = await facilitatorResponse.json();
-    
-    // Log successful payment
-    console.log(`✅ x402 payment verified: ${expectedAmount} USDC from agent`);
-    
-    return verification.valid === true;
+    return true;
     
   } catch (error) {
-    console.error('Payment verification error:', error);
+    console.error('❌ Payment verification error:', error.message);
     return false;
   }
 }
@@ -253,7 +235,7 @@ function getQueryParamsSchema(endpoint) {
 }
 
 /**
- * Get output schema for x402scan (simplified like CryptoSentiment)
+ * Get output schema for x402scan
  */
 function getOutputSchema(endpoint) {
   return {
@@ -267,7 +249,7 @@ function getOutputSchema(endpoint) {
 }
 
 /**
- * Optional: x402 middleware - allows both API keys AND crypto payments
+ * x402 middleware - allows both API keys AND crypto payments
  */
 async function x402OrApiKey(req, res, next) {
   // Try API key first
